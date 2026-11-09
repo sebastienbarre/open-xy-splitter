@@ -9,9 +9,9 @@
 // first key of zone 2, from 2 to 24.
 //
 // Encoders:
-//   1  zone 1 transposition, -4 .. +4 octaves
+//   1  zone 1 transposition, -4 .. +4 octaves for example
 //   2  split point position: the number of the first key of zone 2, 2 .. 24
-//   3  zone 2 transposition, -4 .. +4 octaves
+//   3  zone 2 transposition, -4 .. +4 octaves for example
 //   4  unused
 //
 // A key is identified by its position, the note minus the keyboard's lowest
@@ -54,13 +54,13 @@ const u32 kMinSplitPosition = 2;
 // at least one key.
 const u32 kSplitPositionsCount = kKeysCount - kMinSplitPosition + 1;
 
-// Smallest transposition in octaves; the middle choice of an encoder is 0.
+// Smallest transposition in octaves. Do make sure to keep in sync w/ enums in definition.json
 const i32 kMinOctaves = -4;
 
-// Largest transposition in octaves; the middle choice of an encoder is 0.
+// Largest transposition in octaves. Do make sure to keep in sync w/ enums in definition.json
 const i32 kMaxOctaves = 4;
 
-// Number of choices of a transposition encoder: -4 .. +4 octaves.
+// Number of choices of a transposition encoder: kMinOctaves .. kMaxOctaves octaves (say, -4 .. +4).
 const u32 kTranspositionsCount = kMaxOctaves - kMinOctaves + 1;
 
 // Index of the encoder for zone 1's transposition (the SDK numbers them from 0).
@@ -86,10 +86,10 @@ u32 steps(i32 value, u32 count) {
 // Reads a zone's transposition from its encoder.
 //   controls  the player's four encoders
 //   zone      0 for zone 1, 1 for zone 2
-// Returns the transposition in octaves, -kMaxOctaves .. +kMaxOctaves.
+// Returns the transposition in octaves, kMinOctaves .. kMaxOctaves.
 i32 octaves(const Controls& controls, u32 zone) {
     const u32 encoder = zone == 0 ? kZone1TranspositionEncoder : kZone2TranspositionEncoder;
-    return static_cast<i32>(steps(controls.value[encoder], kTranspositionsCount)) - kMaxOctaves;
+    return static_cast<i32>(steps(controls.value[encoder], kTranspositionsCount)) + kMinOctaves;
 }
 
 // Reads the split from its encoder.
