@@ -5,7 +5,7 @@
   "parameters": [
     {
       "id": "zone1_transpose",
-      "label": "z1tr",
+      "label": "transp1",
       "default": 0.5,
       "mapping": {
         "kind": "enum",
@@ -26,7 +26,7 @@
     },
     {
       "id": "zone2_transpose",
-      "label": "z2tr",
+      "label": "transp2",
       "default": 0.5,
       "mapping": {
         "kind": "enum",

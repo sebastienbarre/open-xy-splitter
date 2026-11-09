@@ -164,7 +164,7 @@ is not evidenced, this file says so.
 - **Original requirement.** Captions `tr1`, `pos`, `tr2`.
 - **Discovery or constraint.** None; a naming decision.
 - **Adjustment.** The owner renamed the ids to `zone1_transpose`, `split_point_position` and `zone2_transpose`, and the captions to
-  `z1tr` and `z2tr`. `pos` is unchanged.
+  `transp1` and `transp2`. `pos` is unchanged.
 - **Rationale.** Clearer names. The owner did not give a more specific reason.
 - **Consequences.** None for behavior.
 

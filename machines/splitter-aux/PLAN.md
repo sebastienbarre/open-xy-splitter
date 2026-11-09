@@ -43,7 +43,7 @@ screen, may send notes to other tracks.
   transposition applied.
 - **Recording.** While recording, the note is recorded in the sequencer in that
   track, with the transposition applied.
-- **Parameters.** `zone1_dest` (label `z1dest`), `zone2_dest` (label `z2dest`).
+- **Parameters.** `zone1_dest` (label `dest1`), `zone2_dest` (label `dest2`).
   Encoder 4 stays unused, with or without Shift.
 - **Process.** Investigate feasibility before implementing. Follow existing SDK
   abstractions and conventions, invent no API names, event types, drawing methods
@@ -215,9 +215,9 @@ Modeled on Conductor (`control.cpp`, `display.cpp`, `display.h`, `words.h`,
 
 | Encoder | Id | Label | Choices | Default (proposal) |
 | --- | --- | --- | --- | --- |
-| 1 | `zone1_dest` | `z1dest` | tracks 1 to 8 | 1 |
+| 1 | `zone1_dest` | `dest1` | tracks 1 to 8 | 1 |
 | 2 | `split_point_position` | `pos` | keys 2 to 24 | 13 |
-| 3 | `zone2_dest` | `z2dest` | tracks 1 to 8 | 2 |
+| 3 | `zone2_dest` | `dest2` | tracks 1 to 8 | 2 |
 | 4 | none | none | absent slot | |
 
 Shift + encoder 1 and 3: transposition -4 to +4, default 0 (requirement), as machine

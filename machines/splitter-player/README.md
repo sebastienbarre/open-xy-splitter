@@ -27,9 +27,9 @@ is F4 to E5. The split can sit between any two keys, white or black.
 
 | Encoder | Caption | Control | Range | Default |
 | --- | --- | --- | --- | --- |
-| 1 | z1tr | Zone 1 transposition, in octaves | -4 to +4 | +0 |
+| 1 | transp1 | Zone 1 transposition, in octaves | -4 to +4 | +0 |
 | 2 | pos | Split point: the number of the first key of zone 2 | 2 to 24 | 13 |
-| 3 | z2tr | Zone 2 transposition, in octaves | -4 to +4 | +0 |
+| 3 | transp2 | Zone 2 transposition, in octaves | -4 to +4 | +0 |
 | 4 | | Not used; shows nothing | | |
 
 All three controls work directly, and Shift does not change their meaning. Each

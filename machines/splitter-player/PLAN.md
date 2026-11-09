@@ -123,15 +123,15 @@ a caption line, and the header strings.
 
 | Encoder | Parameter id | Caption | Values |
 | --- | --- | --- | --- |
-| 1 | `zone1_transpose` | `z1tr` | `-4` to `+4` |
+| 1 | `zone1_transpose` | `transp1` | `-4` to `+4` |
 | 2 | `split_point_position` | `pos` | the number of `splitAtKey`, `2` to `24` |
-| 3 | `zone2_transpose` | `z2tr` | `-4` to `+4` |
+| 3 | `zone2_transpose` | `transp2` | `-4` to `+4` |
 | 4 | `unused` | none | none |
 
 **Requirement.** The three active parameters are primary controls, available without
 Shift. Encoder 4 is unused and shows nothing: no caption, no value, and turning it
 does nothing. The note name is not shown next to the split number (H-08). The
-captions `z1tr` and `z2tr` and the parameter ids were chosen by the project owner (H-12); the
+captions `transp1` and `transp2` and the parameter ids were chosen by the project owner (H-12); the
 original specification used `tr1` and `tr2`.
 
 **Implementation.** The fourth parameter is declared `"absent": true`. This needs the
