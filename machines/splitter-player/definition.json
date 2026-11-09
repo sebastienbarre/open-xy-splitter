@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "id": "splitter_player",
+  "name": "Splitter Player",
+  "parameters": [
+    {
+      "id": "zone1_transpose",
+      "label": "z1tr",
+      "default": 0.5,
+      "mapping": {
+        "kind": "enum",
+        "labels": ["-4", "-3", "-2", "-1", "+0", "+1", "+2", "+3", "+4"]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "split_point_position",
+      "label": "pos",
+      "default": 0.5,
+      "mapping": {
+        "kind": "enum",
+        "labels": ["2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+                   "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24"]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "zone2_transpose",
+      "label": "z2tr",
+      "default": 0.5,
+      "mapping": {
+        "kind": "enum",
+        "labels": ["-4", "-3", "-2", "-1", "+0", "+1", "+2", "+3", "+4"]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "unused",
+      "label": "",
+      "default": 0,
+      "mapping": {"kind": "linear", "minimum": 0, "maximum": 1},
+      "display": "percent",
+      "absent": true
+    }
+  ],
+  "presets": {},
+  "resources": {}
+}
