@@ -4,6 +4,8 @@ A note player for the OP-XY that splits the 24-key keyboard into two zones, each
 with its own octave transposition. Play bass with your left hand and a lead an
 octave or two higher with your right, on a single instrument track.
 
+<img src="screenshots/splitter_player.svg" width="50%">
+
 The player works on the track it is assigned to. It does not route notes to other
 tracks or trigger other instruments. For that, see the separate splitter aux machine.
 

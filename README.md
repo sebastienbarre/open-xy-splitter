@@ -6,7 +6,7 @@ through its catalog, which pins a tagged commit of this repository.
 
 | Machine | Kind | What it shows |
 | --- | --- | --- |
-| [Splitter Player](machines/splitter-player) | Player | A player that allows the user to split the OP-XY keyboard into two zones that can be assigned different octave transpositions. Non-destructive, doesn't record, only maps keys to notes. |
+| [Splitter Player](machines/splitter-player) | Player | A player that allows the user to split the OP-XY keyboard into two zones that can be assigned different octave transpositions. Non-destructive, doesn't record, only maps keys to notes. <br><br><img src="machines/splitter-player/screenshots/splitter_player.svg" width="50%"> |
 | [Splitter Aux](machines/splitter-aux) | Aux | An Aux machine that allows the user to split the OP-XY keyboard into two zones that can be assigned different instrument tracks and octave transpositions. Can record mapped notes. NOT IMPLEMENTED. |
 
 Each folder is one machine: `machine.json` (kind, SDK version and the numbers it
