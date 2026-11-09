@@ -240,20 +240,20 @@ overlay. Run:
 ../.venv/bin/python ../open-xy/sdk.py test --machine machines/splitter-player
 ```
 
-**Build** (from this repository; the `chords` and `fm2op` machines are needed for
-now because of unrelated build issues):
+**Build** (from this repository). The player builds on its own with an SDK that
+includes PR #481 (H-19):
 
 ```sh
 ../.venv/bin/python ../open-xy/sdk.py build --overwrite --out "../firmware/dev/001" \
   --stock-os ../firmware/1.2.1/os.ldr \
-  --machine ../open-xy-core-machines/machines/chords \
-  --machine ../open-xy-core-machines/machines/fm2op \
   --machine machines/splitter-player
 ```
 
-The build writes `layout.json`, which holds the player's type and page numbers.
-Pass it as `--layout` to later builds. Stock firmware loads a player it doesn't
-recognize as Arpeggio.
+The build writes `layout.json`, which holds the machine numbers (the player's type
+and page). Pass it as `--layout` to later builds. Building without `chords` removed
+its entry from `layout.json` (it was there from earlier builds), so add `--machine
+../open-xy-core-machines/machines/chords` if the device should keep that player.
+Stock firmware loads a player it doesn't recognize as Arpeggio.
 
 Device operations need your explicit instruction each time (see `AGENTS.md`).
 

@@ -77,23 +77,22 @@ player starts at the defaults above.
 
 ## Building and testing
 
-Requires the Open-XY SDK, with the change that lets a player leave an encoder empty
-(open-xy pull request #476; it is in `staging` after SDK 1.10). From this repository:
+Requires the Open-XY SDK with two changes that are in `staging` after SDK 1.10: one
+that lets a player leave an encoder empty (open-xy pull request #476) and one that
+lets a player build without any other machine (#481). From this repository:
 
 ```sh
 ../.venv/bin/python ../open-xy/sdk.py test --machine machines/splitter-player
 
 ../.venv/bin/python ../open-xy/sdk.py build --overwrite --out "../firmware/dev/001" \
   --stock-os ../firmware/1.2.1/os.ldr \
-  --machine ../open-xy-core-machines/machines/fm2op \
   --machine machines/splitter-player
 ```
 
-The `fm2op` machine is in the build only because of unrelated build issues when building player
-machines only. You  may substitute any other synth machine until the issue is fixed.
-The build writes `layout.json`; keep it and pass it as `--layout` to later
-builds, so the player keeps its type number. Stock firmware loads a player it does
-not recognize as Arpeggio.
+Add a `--machine` for each other machine you want on the device. The build writes
+`layout.json`; keep it and pass it as `--layout` to later builds, so the player
+keeps its type number. Stock firmware loads a player it does not recognize as
+Arpeggio.
 
 [tests/gestures.cpp](tests/gestures.cpp) covers the zones at all 23 split positions,
 the transposition maths, the keyboard octave, sequenced notes, the pitch limits,

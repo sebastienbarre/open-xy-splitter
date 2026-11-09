@@ -240,3 +240,18 @@ is not evidenced, this file says so.
   first zone 2 key is visually distinguishable on both white and black keys (by the boundary of the shading, H-10).
 - **Rationale.** Not applicable.
 - **Consequences.** The acceptance items are ticked in `PLAN.md`. Release and catalog steps are the only open item.
+
+## H-19 The player builds on its own
+
+- **Date:** 2026-11-09. Type: **constraint**, then **explicit decision**.
+- **Original requirement.** Section 9 of the original plan gave a build command that also builds `chords` and `fm2op`, "needed for now
+  because of unrelated issues with the building process". The cause was not known.
+- **Discovery or constraint.** A collection of players alone failed to compile the SDK's generated `startup.cpp` under `-Wall -Werror`:
+  its id helper `value()` is called only by rows for engines, effect pages and sample screens, so with none it was reported unused.
+  Adding any engine, such as `fm2op`, made it compile. This was an SDK bug (issue #480), not a property of this player.
+- **Adjustment.** The owner asked for the cause to be found and fixed. PR #481 marks the helper unused and adds a regression test; it was
+  merged. `PLAN.md` and `README.md` now build with `--machine machines/splitter-player` alone. A build with the player alone succeeded on
+  `staging`.
+- **Rationale.** The extra machines were a workaround for an SDK defect.
+- **Consequences.** The build command is shorter. Building without `chords` removed its entry from the build's `layout.json`, so add it back with
+  `--machine` if a device should keep that player. The cause of that entry's removal was not investigated.
