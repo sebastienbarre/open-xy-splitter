@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "kind": "player",
+  "description": "Split the OP-XY keyboard into two zones that can be assigned different octave transpositions.",
+  "sdk": "1.8"
+}

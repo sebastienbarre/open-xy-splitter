@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "kind": "aux",
+  "description": "Split the OP-XY keyboard into two zones that can be assigned different instrument tracks and octave transpositions.",
+  "sdk": "1.8"
+}
