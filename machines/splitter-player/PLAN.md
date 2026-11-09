@@ -1,517 +1,331 @@
-# Implementation Specification: Splitter Player for OP-XY
+# Implementation Plan: Splitter Player for OP-XY
+
+This is the authoritative, current plan for the `splitter_player` machine in
+`machines/splitter-player`. It says what we are building and how. How and why it
+differs from the original specification is recorded in
+[PLAN_HISTORY.md](PLAN_HISTORY.md), which also points at the original text
+(git commit `44db806`). Entries there are referenced below as `H-nn`.
+
+Each section separates three kinds of statement:
+
+- **Requirement**: the intended behavior.
+- **SDK constraint**: a limit of the Open-XY SDK or the OP-XY that shapes the design.
+- **Implementation**: how the code meets the requirement today.
+
+## 0. Status
+
+| Area | Status |
+| --- | --- |
+| Note mapping (zones, transposition, pitch limits) | Implemented; host-tested; confirmed working on the device, live and sequenced |
+| Screen (header values, zone shading) | Implemented; confirmed on the device, including the first zone 2 key on white and black keys |
+| Encoder 4 hidden | Implemented through an SDK change merged to `staging` (PR #476); confirmed on the device |
+| Player menu name | Shows `splitter_play` (truncated); accepted for now, to be revisited with the SDK maintainer (section 12) |
+| Setting the split by pressing a key | Not implemented; deferred, see section 11 |
+| README | Written |
+| Release and catalog entry | Not started, see section 12 |
 
 ## 1. Objective
 
-Implement a new OP-XY player named `splitter`.
-
-The purpose of this player is to divide the OP-XY's 24-key physical keyboard into exactly two zones. Each zone can apply an independently configurable octave transposition to incoming notes.
-
-The player must follow the existing OP-XY player architecture and conventions. In particular, it should behave like the stock `arpeggio`, `hold`, and `maestro` players.
-
-### 1.1 Player semantics
-
-A player is a non-destructive note-mapping mechanism.
-
-Players operate on notes that originate from either:
-
-- Physical keyboard input played by the user.
-- Notes recorded in the sequencer on the instrument track to which the player is assigned.
-
-A player transforms or maps incoming notes into other notes or chords. It does not reach out to other instrument tracks, trigger other instruments, or perform instrument-track routing.
-
-The `splitter` player must follow these principles:
-
-- It operates exclusively on the instrument track to which it is assigned.
-- It divides incoming notes into two zones based on their physical keyboard position.
-- It applies the appropriate octave transposition according to the zone.
-- It does not change the instrument track receiving the notes.
-- It does not directly interact with other instrument tracks or their engines.
-- It does not modify the underlying recorded note data destructively.
-
-The player must use the existing note-processing mechanisms to transform incoming notes, rather than implementing its own instrument-triggering or track-routing infrastructure.
-
-## 2. Understanding the OP-XY keyboard
-
-### 2.1 Physical keyboard
-
-The OP-XY has 24 physical keys spanning two octaves.
-
-At its default octave setting (0), the keyboard covers:
-
-- Leftmost key: F3
-- Rightmost key: E5
-
-The keyboard contains 24 chromatic keys, covering F3 through E5 inclusive. This is commonly described as a two-octave keyboard, although the interval between its extreme keys is 23 semitones.
-
-The keyboard should be considered a fixed collection of 24 physical key positions, numbered 1 through 24, from left to right.
-
-### 2.2 Virtual keyboard range
-
-Although the OP-XY has only 24 physical keys, the user can shift their octave using the `-` and `+` buttons.
-
-The default octave setting is 0:
-
-| Octave setting | Keyboard range |
-| - | - |
-| -4 | F-1 – E1 |
-| -3 | F0 – E2 |
-| -2 | F1 – E3 |
-| -1 | F2 – E4 |
-| 0 | F3 – E5 |
-| +1 | F4 – E6 |
-| +2 | F5 – E7 |
-| +3 | F6 – E8 |
-| +4 | F7 – E9 |
-
-The full playable range therefore extends from F-1 to E9.
-
-The octave buttons shift the entire physical keyboard by one octave at a time. They do not change the physical arrangement or number of keys.
-
-The implementation must preserve this existing behavior.
-
-### 2.3 Physical position versus musical pitch
-
-An important distinction for this implementation:
-
-- Physical key position determines which zone a note belongs to.
-- The current keyboard octave determines the note's initial pitch.
-- Zone transposition determines the final pitch produced by the player.
-
-Changing the global keyboard octave must never change the physical split point.
-
-The player must also support notes originating from the sequencer, not just live keyboard input. Where applicable, it must use the physical key position or equivalent source-note information available to the player architecture to determine zone membership.
-
-If the existing architecture does not preserve the necessary physical-position information for sequencer notes, investigate how existing players handle note mapping and determine the appropriate way to associate sequencer notes with the two zones. Do not assume that physical key positions can always be reconstructed from MIDI pitches.
-
-## 3. Player activation
-
-The new player must be registered as `splitter`, following the same mechanism used by the existing stock players.
-
-A user activates keyboard splitting by selecting `splitter` as the player for an instrument track.
-
-The player establishes exactly two zones.
-
-Both zones belong to the instrument track on which the player is activated.
-
-There must always be exactly two zones. Supporting additional zones is explicitly outside the scope of this implementation.
-
-## 4. Zone definition and split point
-
-### 4.1 Default configuration
-
-The 24 physical keys are divided into two contiguous zones.
-
-By default, the split point is between physical keys 12 and 13:
-
-- Zone 1: keys 1–12 (12 keys).
-- Zone 2: keys 13–24 (12 keys).
-
-### 4.2 Adjustable split point
-
-The user can adjust the split point using encoder (knob) #2.
-
-There are 23 possible split positions:
-
-| Split position | Zone 1 | Zone 2 |
-| - | - | - |
-| Between keys 1 and 2 | 1 key | 23 keys |
-| Between keys 2 and 3 | 2 keys | 22 keys |
-| ... | ... | ... |
-| Between keys 12 and 13 | 12 keys | 12 keys |
-| ... | ... | ... |
-| Between keys 23 and 24 | 23 keys | 1 key |
-
-Both zones must always contain at least one physical key.
-
-Consequently, the split point must never move before key 1 or after key 23.
-
-The encoder should provide an appropriate representation of the split position, following the conventions of existing players.
-
-Internally, prefer representing the split point as the index of the first key in Zone 2 (`splitAtKey`), with a valid range of 2–24 and a default value of 13.
-
-Zone 2 then starts at `splitAtKey`.
-
-The split point is based exclusively on physical key position. It is not restricted to boundaries between white keys. All 23 physical boundaries must be available, including boundaries between a black key and a white key.
-
-## 5. Independent zone transposition
-
-Each zone has an independently configurable octave transposition.
-
-Both transposition parameters are directly accessible using the primary encoder controls. They are not Shift-modified parameters.
-
-The transposition range is -4 to +4 octaves, inclusive, in increments of one octave.
-
-### 5.1 Zone 1 transposition
-
-Encoder #1 controls the octave transposition for Zone 1.
-
-- Default: +0 octaves.
-- Positive values transpose upwards.
-- Negative values transpose downwards.
-
-### 5.2 Zone 2 transposition
-
-Encoder #3 controls the octave transposition for Zone 2.
-
-- Default: +0 octaves.
-- Positive values transpose upwards.
-- Negative values transpose downwards.
-
-### 5.3 Global octave interaction
-
-The existing `-` and `+` keyboard octave controls must continue to work.
-
-They shift the entire physical keyboard together.
-
-The zone-specific octave transpositions must remain unchanged when the global octave is modified.
-
-For example:
-
-- Global keyboard octave: +1.
-- Zone 1 transposition: 0.
-- Zone 2 transposition: -1.
-
-The resulting pitch ranges are:
-
-- Zone 1: F4–E5.
-- Zone 2: F3–E4.
-
-The final note pitch is calculated as:
-
-`finalPitch = originalPitch + (globalOctave * 12) + (zoneOctaveTranspose * 12)`
-
-Use the existing OP-XY pitch representation and note conversion utilities wherever possible.
-
-The allowable transposition range should follow the existing player/engine conventions and the supported pitch range. Inspect the existing implementation before choosing limits. Do not arbitrarily introduce a new pitch range.
-
-If the resulting pitch exceeds the supported range, follow the existing note-range handling conventions rather than introducing undocumented wrapping or clipping behavior.
-
-### 5.4 Transposition independence
-
-Changing the transposition of one zone must never affect the other.
-
-Changing the global keyboard octave must never modify either zone's configured transposition.
-
-The player must preserve the relative pitch relationship between the two zones when the global octave changes.
+**Requirement.** Implement an OP-XY note player that divides the 24-key physical
+keyboard into exactly two zones. Each zone applies its own octave transposition to
+incoming notes.
+
+A player is a non-destructive note-mapping mechanism. It works on notes from the
+physical keyboard and from the sequencer on the instrument track it is assigned
+to. It never routes to other tracks, triggers other instruments, or rewrites
+recorded notes. It uses the SDK's existing note-processing path, as the stock
+Arpeggio, Hold and Maestro players do, and the existing `chords` player does.
+
+**Scope note.** A second, separate machine, `splitter-aux`, will route zones to
+other tracks. It is not part of this plan, and this player has no destination
+track state.
+
+## 2. The OP-XY keyboard
+
+**Requirement.** The keyboard is 24 chromatic keys, numbered 1 to 24 from the left.
+At octave 0 they span F3 to E5. The `-` and `+` buttons shift the whole keyboard by
+octaves, from F-1 to E9 at the extremes, and must keep working unchanged. A key's
+zone depends on its physical position, never on the keyboard octave.
+
+**SDK constraint (H-02).** The SDK delivers a note's pitch only. There is no
+physical key identity. `Controls::lowest_key` is the pitch of the lowest key at
+the track's current octave, so a key's position is `note - lowest_key`
+(0 to 23 for keys 1 to 24). A live note already carries the keyboard octave.
+A sequenced note keeps the pitch it was recorded with, so its position is computed
+against the octave at playback. This is the intended behavior: a track played at a
+different keyboard octave than it was recorded at may place some notes in the other zone.
+
+**Implementation.** Position is `note - lowest_key`. The split is a line through all
+pitches: a position below `splitAtKey` is in zone 1 and a position at or above it is
+in zone 2, however far outside the 24 keys of the current octave it lies. Nothing is
+clamped or moved; the note is only assigned to a zone, and then its zone's
+transposition applies. This is the intended behavior.
+
+## 3. Identity and activation
+
+**Requirement.** The user selects the player on an instrument track and the split
+behavior applies to that track.
+
+**Implementation.** `definition.json` has `id` `splitter_player` and `name`
+`Splitter Player`. The id is also the C++ namespace and the prefix of the artwork
+IDs, and is limited to 15 characters. It was lengthened from `splitter` so a later
+`splitter_aux` can sit beside it (H-14).
+
+**SDK constraint (H-14).** The player menu lists the machine's `id`, not its
+`name`, and shows about 13 characters. `splitter_player` appears as
+`splitter_play`. There is no separate on-device label field. This is accepted for
+now; a `menuName` field will be reconsidered with the SDK maintainer.
+
+## 4. Zones and split point
+
+**Requirement.** There are exactly two zones. Zone 1 is keys 1 to `splitAtKey - 1`
+and zone 2 is keys `splitAtKey` to 24. `splitAtKey` ranges from 2 to 24 (23
+boundaries, including black-to-white ones) and defaults to 13. Neither zone is ever
+empty. Encoder 2 sets it.
+
+**Implementation.** Encoder 2 is a 23-choice enum labelled `2` to `24`, default
+choice 13. The split is stored as that choice, not as player state.
+
+## 5. Zone transposition
+
+**Requirement.** Each zone has an octave transposition from -4 to +4, default 0.
+Encoder 1 sets zone 1's and encoder 3 sets zone 2's. They are independent, and the
+keyboard octave buttons never change them.
+
+The final pitch is `originalPitch + 12 * globalOctave + 12 * zoneOctaves`.
+
+**SDK constraint (H-03).** A live note's pitch already includes the keyboard octave,
+so the player computes `note + 12 * zoneOctaves`.
+
+**Pitch limits (H-04).** MIDI covers 0 to 127. A transposed note outside it is not
+played. It is never clamped or wrapped, which follows the `chords` player's
+documented convention. This is confirmed as intended.
+
+**Implementation.** Encoders 1 and 3 are 9-choice enums labelled `-4` to `+4`,
+default `+0`.
 
 ## 6. User interface
 
-### 6.1 General layout
+### 6.1 Layout
 
-When the `splitter` player is selected, the screen should display:
+**Requirement.** The screen shows the player header with four encoder slots, and
+below it a picture of the 24 keys that resembles the real OP-XY keyboard rather than
+a piano.
 
-1. The usual player parameter interface at the top, with four encoder parameter slots laid out horizontally.
-2. A graphical representation of the 24 physical OP-XY keyboard keys below it.
+**SDK constraint (H-07).** The header is the stock header. Its captions come from
+the parameter labels in `definition.json` (at most 8 characters, shown lowercase)
+and its values from the strings the player returns (at most 7 characters). The
+`param_bar` in the design file is not used. The page itself is retained artwork
+(`panel.svg.fragment`) that the player can only drive through 24 show/hide "dots",
+a caption line, and the header strings.
 
-The visual keyboard must resemble the actual OP-XY keyboard, not a conventional piano keyboard.
+### 6.2 Encoder slots
 
-Refer to the `splitter.svg` SVG file to build the layout. Each UI element in this SVG has a unique `id`. More on this below.
+| Encoder | Parameter id | Caption | Values |
+| --- | --- | --- | --- |
+| 1 | `zone1_transpose` | `z1tr` | `-4` to `+4` |
+| 2 | `split_point_position` | `pos` | the number of `splitAtKey`, `2` to `24` |
+| 3 | `zone2_transpose` | `z2tr` | `-4` to `+4` |
+| 4 | `unused` | none | none |
 
-Do not introduce a generic piano keyboard graphic.
+**Requirement.** The three active parameters are primary controls, available without
+Shift. Encoder 4 is unused and shows nothing: no caption, no value, and turning it
+does nothing. The note name is not shown next to the split number (H-08). The
+captions `z1tr` and `z2tr` and the parameter ids were chosen by the project owner (H-12); the
+original specification used `tr1` and `tr2`.
 
-### 6.2 Encoder parameter display
+**Implementation.** The fourth parameter is declared `"absent": true`. This needs the
+SDK change merged as PR #476 (H-13).
 
-The four encoder slots should display the following parameters:
+### 6.3 Keyboard picture
 
-| Encoder | Parameter | Description | SVG `id` of label | Label to use | SVG `id` of value | Values to use |
-| - | - | - | - | - | - | - |
-| #1 | Zone 1 Transpose | Octave transposition for Zone 1 | `param1` | "tr1" | `value1` | -4, -3, -2, -1, +0, +1, +2, +3, +4 |
-| #2 | Split Point | Boundary between the two zones | `param2` | "pos" | `value2` | value of `splitAtKey` with the note shown in parenthesis after it, without the octave, e.g. "13 (F)" |
-| #3 | Zone 2 Transpose | Octave transposition for Zone 2 | `param3` | "tr2" | `value3` | -4, -3, -2, -1, +0, +1, +2, +3, +4 |
+**Requirement.** All 24 keys are shown in their physical order, taken from
+`designs/splitter.svg` (key boxes `r1` to `r24`, key pads `k1` to `k24`). Zone 1 keys
+are drawn dark (#323232) and zone 2 keys light (#969696). The picture updates
+immediately when the split changes and does not move when the keyboard octave
+changes. The cue works whether the first zone 2 key is white or black.
 
-Encoder #4 is unused for now.
+**SDK constraint (H-09).** A player cannot recolor shapes at run time. It can only
+show or hide up to 24 pre-drawn shapes. A key box's fill therefore cannot be changed
+from the player.
 
-All three active parameters are primary controls and should be displayed in the normal player UI without requiring Shift.
+**Implementation (H-09, H-11).** `artwork.py` generates `panel.svg.fragment` from
+`designs/splitter.svg` in layers, from bottom to top:
 
-The values displayed should reflect the current configuration.
+1. All 24 key boxes in zone 2's color.
+2. 23 zone 1 overlays (dots 0 to 22). Dot `k` covers keys 1 to `k + 1`, the zone 1
+   keys for a split at key `k + 2`, in zone 1's color. The player shows exactly one.
+3. A 24th dot that is never shown, because the SDK requires all 24.
+4. The key pads as filled discs, then the key outlines, over the overlays.
+5. The caption line the SDK requires, left empty.
 
-### 6.3 Keyboard visualization
+Strokes are #000000, 1 px wide. Geometry is snapped to the pixel grid: box edges and
+pad centres sit at pixel centres, pads are circles of radius 10, and key corners are
+square. The design file is the source of the key geometry and is not changed.
 
-Display all 24 physical keys in their actual left-to-right order.
+**Changed requirement (H-10).** The original specification marked the first zone 2
+key by recoloring its ellipse (#646464). That marker is dropped. The first zone 2
+key is recognizable as the first key of the lighter zone.
 
-The keys are already preset in the `splitter.svg` SVG file, under the group with `keyboard` ID.
+### 6.4 Shift
 
-Each key is made of two elements:
+**Requirement.** Holding Shift does not change the meaning of the three active
+encoders, and no Shift parameters exist.
 
-- a box representing the outline of the physical key. This is a SVG `path` with an ID starting with the letter `r` and followed by the index of the key (e.g. `r13`).
-- a circle representing the area inside the physical key that the user is making contact with. This is a SVG `ellipse` with an ID starting with the letter `k` and followed by the index of the key (e.g. `k13`).
-
-The visualization must distinguish Zone 1 from Zone 2. To do so, each SVG box in Zone 1 should have its `fill:none` attribute changed to RGB(50, 50, 50) i.e. hex #323232, and each SVG box in Zone 2 should have its `fill:none` changed to RGB(150, 150, 150) i.e. hex #969696. The `stroke` attribute should NOT be changed.
-
-The split point must be represented by changing the `fill:none` attribute of the SVG ellipse of the first key belonging to Zone 2 to RGB(100, 100, 100) i.e. #646464.
-
-For example, with the default split:
-
-- Keys 1–12 belong to Zone 1 and should all have their boxes set to fill #323232.
-- Keys 13–24 belong to Zone 2 and should all have their boxes set to fill #969696.
-- Key 13 should have its ellipse set to fill #646464.
-
-When the user changes the split point with encoder #2:
-
-- The visual division between the zones must update immediately.
-- The position of the split point on the new first key of Zone 2 should be updated immediately.
-
-These visual cues should be correct regardless of whether the first key of Zone 2 is a white or black key.
-
-The visualization should remain fixed in physical-key space when the global keyboard octave changes.
-
-### 6.4 Shift behavior
-
-The three active parameters are controlled directly by their respective encoders.
-
-Holding Shift must not change the meaning of these three controls.
-
-In particular:
-
-- Encoder #1 continues to control Zone 1 transposition.
-- Encoder #2 continues to control the split point.
-- Encoder #3 continues to control Zone 2 transposition.
-
-There are no alternate Shift-modified parameters required for this initial implementation.
-
-Follow existing player conventions for displaying the UI while Shift is held, without introducing additional parameters or changing the behavior described above.
+**SDK constraint.** The player's turn handler applies the encoder's detents without a
+Shift-dependent meaning, and the player gets no Shift state. Confirmed on the device:
+holding Shift changes nothing (H-17).
 
 ## 7. State and parameter model
 
-The implementation should maintain the following logical state:
-
-- `splitAtKey`: first physical key belonging to Zone 2, integer 2–24, default 13.
-- `zone1Transpose`: octave transposition for Zone 1, default 0.
-- `zone2Transpose`: octave transposition for Zone 2, default 0.
-
-The two zones are derived from `splitAtKey`:
-
-- Zone 1 contains physical keys 1 through `splitAtKey - 1`.
-- Zone 2 contains physical keys `splitAtKey` through 24.
-
-There is no destination instrument track state. Both zones operate on the instrument track to which the player is assigned.
-
-Parameter changes should be reflected immediately in the UI and in subsequent note processing.
-
-Follow the existing player parameter persistence and serialization conventions. Ensure that the default values are correctly restored when creating a new player instance.
-
-## 8. Note processing and edge cases
-
-The following behaviors must be handled correctly.
-
-### 8.1 Zone boundaries
-
-- Key 1 always belongs to Zone 1.
-- Key 24 always belongs to Zone 2.
-- The split boundary is inclusive for Zone 2 and exclusive for Zone 1.
-- Every physical key belongs to exactly one zone.
-
-For a split start at key 13:
-
-- Keys 1–12 belong to Zone 1.
-- Keys 13–24 belong to Zone 2.
-
-### 8.2 Note mapping
-
-For every incoming note:
-
-1. Determine its zone using the physical key position or equivalent source-note information.
-2. Select the transposition configured for that zone.
-3. Calculate the resulting pitch.
-4. Pass the transformed note through the existing player/note-processing mechanism.
-5. Preserve the original note's other properties unless existing player conventions specify otherwise.
-
-The resulting note must remain on the same instrument track.
-
-The player must not:
-
-- Route notes to another instrument track.
-- Trigger another instrument engine directly.
-- Bypass the existing player processing pipeline.
-- Modify the original sequencer note data destructively.
-
-### 8.3 Note-on and note-off
-
-Note-off events must correspond to the transformed pitch of their associated note-on events.
-
-Do not recalculate routing or pitch using the current configuration when a note-off arrives.
-
-This matters because the user may change the split point or transposition while notes are being held.
-
-Maintain whatever active-note bookkeeping is necessary to preserve this relationship, following the existing player architecture.
-
-Handle repeated notes, overlapping notes, and simultaneous notes correctly.
-
-### 8.4 Configuration changes during playback
-
-Changing the split point or either transposition should affect subsequent note-processing events.
-
-Already-active notes must retain their original note-off correspondence.
-
-Avoid stuck notes when parameters change while keys are held.
-
-### 8.5 Sequencer playback
-
-The player must operate on notes recorded in the sequencer, in addition to live keyboard input.
-
-The same zone and transposition rules should apply to sequencer notes.
-
-The player must not destructively rewrite the recorded notes.
-
-Disabling the player or selecting another player should restore the original note behavior, according to the existing player architecture.
-
-Do not implement a separate sequencer playback system. Use the existing mechanism through which stock players process sequencer notes.
-
-### 8.6 Multiple simultaneous notes
-
-The player must support polyphonic note input.
-
-Notes in both zones may be played simultaneously.
-
-Each note must be transformed according to its own zone, without affecting other active notes.
-
-### 8.7 Pitch limits
-
-If a transposed note exceeds the supported pitch range, follow existing OP-XY player conventions.
-
-Do not introduce undocumented pitch wrapping, clipping, or note-dropping behavior.
-
-### 8.8 Sequencer Notes and Dynamic Split Mapping
-
-The splitter player must apply the same zone classification and transposition rules to notes originating from the sequencer as it does to notes played live on the keyboard.
-
-- **Recording:** Notes must be recorded at their original, un-transposed pitches. The splitter must not modify the notes stored in the sequencer.
-- **Playback:** When a sequencer note is played, the splitter evaluates its pitch against the current split point and determines which zone it belongs to. It then applies that zone's current octave transposition.
-- **Dynamic configuration:** Zone classification and transposition are evaluated at playback time, using the current split point and zone settings. Changing the split point or either zone's transposition must therefore affect subsequent sequencer playback without requiring notes to be re-recorded.
-- **Consistent behavior:** Live keyboard input and sequencer playback must follow the same mapping logic. The sequencer does not need to preserve the physical key position originally used to enter a note; the note's original pitch is sufficient to determine its zone relative to the current split.
-
-The transformation must remain non-destructive: the original recorded notes are preserved, and the splitter applies its mapping only as notes pass through the player during playback.
-
-## 9. Implementation approach
-
-You are currently in the `open-xy-splitter` repository.
-
-This player is to be implemented in the `machines/splitter-player` sub-directory, which only contains `machine.json`, `PLAN.md` (this file), `README.md`, and `splitter.svg` files.
-
-This player should use the Open-XY SDK API located in `../open-xy`. Make sure you familiarize yourself with its API. Its documentation is found in `../open-xy/docs`.
-
-The only existing player ever implemented using this SDK is the `chords` player. It is very important that you refer to its source code for this implementation. Its repository is found in `../open-xy-core-machines/machines/chords`, its documentation can be found in `../open-xy-core-machines/machines/chords/README.md`. Make sure to follow its conventions.
-
-Before coding, inspect these above repositories to identify:
-
-1. The registration mechanism for players.
-2. The player interface, lifecycle, and parameter definition conventions.
-3. How players receive physical keyboard note events.
-4. How the OP-XY represents physical key positions separately from note pitches, if applicable.
-5. How the current global keyboard octave is applied.
-6. How note-on and note-off events are represented and processed.
-7. How players transform notes without destructively modifying the underlying sequencer data.
-8. How sequencer notes are passed through the player processing pipeline.
-9. How encoder parameters are declared, updated, and displayed.
-10. How player-specific graphics are rendered and updated.
-11. How player configuration is serialized and restored.
-12. How existing players handle polyphony and active-note life cycles.
-
-Implement the new player by following existing abstractions and conventions.
-
-Prefer reusing existing mechanisms over introducing new infrastructure.
-
-Do not modify stock player behavior.
-
-Do not introduce unrelated refactoring.
-
-Do not invent API names, event types, drawing methods, or note-processing mechanisms. Derive these from the existing source code and document any architectural limitations discovered.
-
-If the existing architecture does not expose the information needed to distinguish physical key position from note pitch, investigate the existing player behavior and determine how best to implement the split.
-
-Pay particular attention to the distinction between live keyboard input and sequencer playback. Both must produce consistent results.
-
-I repeat. Do not start implementation immediately. First inspect the SDK, its documentation, and the existing `chords` player. Report the relevant APIs, the available note-processing mechanisms, and any architectural limitations. In particular, establish how physical keyboard positions and sequencer notes are represented. Present a proposed implementation approach before modifying any files. Do not proceed with implementation until this investigation is complete.
-
-### Building the player
-
-From this `open-xy-splitter` repository, use `../.venv/bin/python ../open-xy/sdk.py build --overwrite --out "../firmware/dev/001" --stock-os ../firmware/1.2.1/os.ldr --machine ../open-xy-core-machines/machines/chords --machine ../open-xy-core-machines/machines/fm2op --machine machines/splitter-player` to build this player.
-
-Note that `--machine ../open-xy-core-machines/machines/chords --machine ../open-xy-core-machines/machines/fm2op` are needed for now because of unrelated issues with the building process.
-
-Once the custom firmware has been built successfully, I can push it to the OP-XY and test any functionality for you manually.
+**Requirement.** The logical state is `splitAtKey` (2 to 24, default 13),
+`zone1Transpose` and `zone2Transpose` (-4 to +4, default 0). New player instances
+start at those defaults, and the settings persist with the project.
+
+**SDK constraint (H-06).** Player state is zeroed, holds no settings, and is not
+saved. Encoder values are saved as stock player parameters.
+
+**Implementation.** The three values are the choices of encoders 1, 2 and 3, with
+defaults set in `definition.json`. The player's `State` is empty. Nothing needs
+restoring on reset.
+
+## 8. Note processing
+
+**Requirement.** For every incoming note, live or sequenced:
+
+1. Find its zone from its position.
+2. Apply that zone's transposition.
+3. Pass the resulting note through the SDK's player pipeline, keeping its velocity.
+
+The result stays on the same track and the recorded note is never changed. Zone
+and transposition are evaluated when the note plays, so changing a setting affects
+the next notes, including sequenced ones, without re-recording. Polyphony works and
+each note uses its own zone.
+
+**Note-off (H-05).** Held notes must not stick when a setting changes. The SDK
+releases the tones it played for a root note when that note is released, so the
+player does not recalculate anything on release. `release` returns `false` so the
+stock player does the release.
+
+**SDK constraint.** A note callback cannot tell a live key from a sequenced note.
+
+**Implementation.** `press` builds a one-tone plan: pitch `note + 12 * zoneOctaves`,
+original velocity, delay 0. It returns `true` with an empty plan when the result is
+outside 0 to 127.
+
+## 9. Implementation details
+
+| File | Purpose |
+| --- | --- |
+| `machine.json` | `kind: player`, `sdk: 1.8` |
+| `definition.json` | The four parameters (section 6.2) |
+| `player.cpp` | `splitter_player` namespace: empty `State`, `press`, `release`, `display` |
+| `artwork.py` | Generates `panel.svg.fragment` (section 6.3) |
+| `panel.svg.fragment` | Generated page artwork; commit it after regenerating |
+| `tests/gestures.cpp` | Host tests (below) |
+| `../../designs/splitter.svg`, `splitter.afdesign` | Key geometry source and its editable design |
+
+**Artwork rules the SDK enforces.** Dot elements must be a `path` or `circle` with
+explicit fill, stroke, stroke width and a `matrix(1 0 0 1 x y)` transform. There is
+no `style` attribute. Numbers have at most four decimals. All 24 dots and a caption
+text node must be present.
+
+**Tests.** `tests/gestures.cpp` covers: zone assignment at all 23 splits, pitch
+maths with the zone transposition, the keyboard octave moving pitch but not the
+split, sequenced notes (a different keyboard octave, and keys beyond the keyboard),
+pitch limits, note release after a setting changes, and the display strings and lit
+overlay. Run:
+
+```sh
+../.venv/bin/python ../open-xy/sdk.py test --machine machines/splitter-player
+```
+
+**Build** (from this repository; the `chords` and `fm2op` machines are needed for
+now because of unrelated build issues):
+
+```sh
+../.venv/bin/python ../open-xy/sdk.py build --overwrite --out "../firmware/dev/001" \
+  --stock-os ../firmware/1.2.1/os.ldr \
+  --machine ../open-xy-core-machines/machines/chords \
+  --machine ../open-xy-core-machines/machines/fm2op \
+  --machine machines/splitter-player
+```
+
+The build writes `layout.json`, which holds the player's type and page numbers.
+Pass it as `--layout` to later builds. Stock firmware loads a player it doesn't
+recognize as Arpeggio.
+
+Device operations need your explicit instruction each time (see `AGENTS.md`).
 
 ## 10. Acceptance criteria
 
-The implementation is complete when all of the following are satisfied.
+Status key: **host** = covered by `tests/gestures.cpp`; **device** = reported working on
+the OP-XY; **open** = not yet verified.
 
-### Player registration
+### Registration
 
-- [ ] A new player named `splitter` is available.
-- [ ] Selecting it activates split behavior on the selected instrument track.
+- [x] The `splitter_player` player is available and selectable. Device: it appears in the menu (name truncated).
+- [x] Selecting it applies the split to the selected track. Device (sequenced playback and zone view reported working).
 
-### Keyboard zones
+### Zones
 
-- [ ] Exactly two zones are created.
-- [ ] The default split is between physical keys 12 and 13.
-- [ ] Encoder #2 adjusts the split point.
-- [ ] The split point can be moved between keys 1/2 and 23/24, inclusive.
-- [ ] Neither zone can become empty.
-- [ ] All 23 physical boundaries are available, including boundaries involving black keys.
-- [ ] The split remains associated with physical key positions when changing octaves.
+- [x] Exactly two zones; default split between keys 12 and 13. Host.
+- [x] All 23 boundaries available; neither zone can be empty. Host.
+- [x] The split stays on physical keys when the keyboard octave changes. Host.
+- [x] Encoder 2 moves the split live. Host (value) and device (confirmed).
 
 ### Transposition
 
-- [ ] Encoder #1 adjusts Zone 1 octave transposition.
-- [ ] Encoder #3 adjusts Zone 2 octave transposition.
-- [ ] Both default to zero.
-- [ ] Positive and negative octave transpositions work.
-- [ ] Global octave changes affect both zones.
-- [ ] Zone-specific transposition remains unchanged by global octave changes.
-- [ ] The final pitch is the sum of the original pitch, global octave shift, and zone-specific octave shift.
-- [ ] Changing one zone's transposition does not affect the other.
+- [x] Zone transpositions are independent, default 0, -4 to +4. Host.
+- [x] Final pitch is the note plus the zone's octaves; keyboard octave handled as in section 5. Host.
+- [x] Encoders 1 and 3 set the zone transpositions. Device (confirmed working).
 
 ### Note processing
 
-- [ ] Notes from Zone 1 receive Zone 1 transposition.
-- [ ] Notes from Zone 2 receive Zone 2 transposition.
-- [ ] The player operates exclusively on its assigned instrument track.
-- [ ] No notes are routed to other instrument tracks.
-- [ ] No other instrument engines are directly triggered.
-- [ ] Both live keyboard input and sequencer notes are processed.
-- [ ] Sequencer note data remains unmodified.
-- [ ] Disabling the player restores normal note behavior.
-- [ ] Note-off events correctly correspond to their original transformed note-on events.
-- [ ] Changing parameters while notes are held does not cause stuck notes.
-- [ ] Repeated, overlapping, and simultaneous notes are handled correctly.
+- [x] Zone 1 and zone 2 notes get their own transposition; polyphony works. Host.
+- [x] Sequenced notes are processed, and the recorded data is untouched. Host, and device (reported working).
+- [x] Release uses the original note, so changing a setting does not strand it. Host (release returns `false`; the SDK's release handling is not re-tested here).
+- [x] Disabling the player restores normal note behavior. Device (confirmed working).
+- [x] Repeated and overlapping notes are handled. Device (confirmed working).
 
 ### User interface
 
-- [ ] The four encoder parameter slots appear at the top.
-- [ ] Encoder #1 displays Zone 1 Transpose.
-- [ ] Encoder #2 displays Split Point.
-- [ ] Encoder #3 displays Zone 2 Transpose.
-- [ ] Encoder #4 remains unused, following existing conventions.
-- [ ] All three active parameters are available without holding Shift.
-- [ ] Holding Shift does not change the meaning of the three active controls.
-- [ ] The keyboard graphic represents the actual OP-XY keyboard based on the provided SVG, not a piano.
-- [ ] All 24 physical keys are represented.
-- [ ] Zone membership is visually distinguishable.
-- [ ] The first key of Zone 2 is visually distinguishable on both white and black keys.
-- [ ] The keyboard visualization updates immediately when the split point changes.
-- [ ] The visualization remains fixed in physical-key space when changing octaves.
+- [x] Encoder 1, 2 and 3 captions and values as in section 6.2. Host (strings). Device: the `pos` value was too wide with the note name (H-08); no other device report.
+- [x] Encoder 4 empty on the device. Device (confirmed hidden after PR #476).
+- [x] Shift does not change the three controls. Device (confirmed).
+- [x] The keyboard picture follows the design and shows both zones. Device.
+- [x] The first zone 2 key is distinguishable on white and black keys. Changed: boundary of the shading only (H-10). Device (confirmed visually).
 
 ### Quality
 
-- [ ] Player settings persist according to existing conventions.
-- [ ] Appropriate tests cover zone assignment, pitch calculation, note processing, and note lifecycle.
-- [ ] Tests cover both live keyboard input and sequencer playback if possible.
-- [ ] Existing tests continue to pass.
-- [ ] No unrelated functionality is modified.
+- [x] Settings persist as encoder values (SDK stock player parameters). By design; not separately tested.
+- [x] Tests exist for zone assignment, pitch, notes, lifecycle, sequenced notes. Host.
+- [x] The SDK check passes (`sdk.py check`, 493 tests on macOS).
+- [x] No stock behavior is modified.
 
 ## 11. Scope boundaries
 
-The following features are explicitly excluded from this initial implementation:
+Excluded, as in the original plan: more than two zones, semitone transposition,
+routing to other tracks, layering tracks, directly triggering other engines,
+per-zone velocity or expression, configurable keyboard layouts, and Shift-modified
+parameters.
 
-- More than two zones.
-- Independent semitone transposition (only octave transposition is required).
-- Routing notes to different instrument tracks.
-- Layering multiple instrument tracks within a zone.
-- Directly triggering other instrument engines.
-- Independent velocity curves or other per-zone expression processing.
-- Configurable physical keyboard layouts.
-- Additional Shift-modified parameters.
+## 12. Open questions and decisions needing approval
 
-The implementation should remain small, focused, and consistent with the existing OP-XY player architecture.
+### Open
 
-The priority is a reliable two-zone live and sequenced note-mapping player with clear visual feedback and predictable note transformation.
+- **Release.** Tagging, the catalog entry and any hardware measurement
+requirements (see `AGENTS.md`) have not been started.
+
+### Parked
+
+- **Menu name.** `splitter_player` is shown as `splitter_play`. This is accepted for
+  now. The `menuName` SDK idea (H-14) will be reconsidered later with the SDK
+  maintainer, as will setting the split by pressing a key (H-15).
+
+- **Deferred (H-15).** Setting the split by pressing a key (or a `learn`
+setting on encoder 4 that makes the next key set the split) is not in scope.
+Players cannot see encoder clicks or Shift, and cannot change a parameter, so it
+needs an SDK change that the SDK maintainer has not reviewed. A working prototype
+was built and discarded. The design is recorded in `PLAN_HISTORY.md`. Encoder 2 is
+the only way to set the split for now.

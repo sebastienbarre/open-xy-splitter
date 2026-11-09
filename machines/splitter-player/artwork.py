@@ -4,9 +4,9 @@ The OP-XY draws a player's page from artwork it cannot recolor: a player can onl
 show or hide up to 24 pre-drawn shapes ("dots", splitter_player_dot_0..23). So the page is
 made of layers, from bottom to top:
 
-  1. the 24 key boxes, all in zone 2's colour;
+  1. the 24 key boxes, all in zone 2's color;
   2. 23 zone 1 overlays (dots 0..22). Dot k covers keys 1..k + 1, the keys before a
-     split at key k + 2, in zone 1's colour. Only one is shown at a time,
+     split at key k + 2, in zone 1's color. Only one is shown at a time,
      chosen by the player, so the keyboard looks split in two zones;
   3. a 24th dot that is never shown, because the SDK requires all 24;
   4. the key pads (filled discs) and the key outlines, drawn again so the overlays
@@ -102,7 +102,7 @@ def key_box(bounds, paint):
 
 
 def overlay(boxes, last):
-    """Draws a zone 1 overlay: the first keys of the keyboard in zone 1's colour.
+    """Draws a zone 1 overlay: the first keys of the keyboard in zone 1's color.
 
     boxes: the bounding rectangle of each key, from the left-most.
     last:  the number of keys to cover, from the left-most.
@@ -130,7 +130,7 @@ def build(design):
     outline = 'fill="none" stroke="%s" stroke-width="%s"' % (EDGE, STROKE_WIDTH)
     parts = ['<g id="%s_panel">' % PREFIX, '<rect x="0" y="20" width="480" height="200" fill="#000000"/>']
 
-    # Layer 1: every key in zone 2's colour.
+    # Layer 1: every key in zone 2's color.
     zone2 = 'fill="%s" stroke="%s" stroke-width="%s"' % (ZONE2_FILL, EDGE, STROKE_WIDTH)
     for k in range(KEYS):
         parts.append(key_box(boxes[k], zone2))
