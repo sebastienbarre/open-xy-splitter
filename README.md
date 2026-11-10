@@ -1,4 +1,4 @@
-# Open-XY machines
+# Open-XY Splitter
 
 Machines build on the Open-XY SDK, for the OP-XY on OS 1.2.1. They are built with the
 [Open-XY SDK](https://github.com/etcetc000/open-xy) and reach the [builder](https://open-xy.com)
