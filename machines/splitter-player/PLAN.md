@@ -157,10 +157,11 @@ from the player.
    keys for a split at key `k + 2`, in zone 1's color. The player shows exactly one.
 3. A 24th dot that is never shown, because the SDK requires all 24.
 4. The key pads as filled discs, then the key outlines, over the overlays.
-5. The caption line the SDK requires, left empty.
+5. The SDK's output keyboard along the bottom (H-20): 128 keys and 128 activity
+   dots, which the SDK lays out and lights for the notes the player sounds.
+6. The caption line the SDK requires, left empty.
 
-Strokes are #000000, 1 px wide. Geometry is snapped to the pixel grid: box edges and
-pad centres sit at pixel centres, pads are circles of radius 10, and key corners are
+Strokes are #000000, 1 px wide. Pads are circles of radius 10, and key corners are
 square. The design file is the source of the key geometry and is not changed.
 
 **Changed requirement (H-10).** The original specification marked the first zone 2

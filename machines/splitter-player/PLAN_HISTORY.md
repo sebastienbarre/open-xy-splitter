@@ -255,3 +255,19 @@ is not evidenced, this file says so.
 - **Rationale.** The extra machines were a workaround for an SDK defect.
 - **Consequences.** The build command is shorter. Building without `chords` removed its entry from the build's `layout.json`, so add it back with
   `--machine` if a device should keep that player. The cause of that entry's removal was not investigated.
+
+## H-20 The SDK's output keyboard shows the transposed notes
+
+- **Date:** 2026-11-09. Type: **constraint** (discovered), then **explicit decision**.
+- **Original requirement.** None; the page showed only the physical keyboard and the zones.
+- **Discovery or constraint.** The community `scales` player shows a second keyboard that is not part of the 24 dots. A player page may
+  also author `<id>_key_0..127` and `<id>_played_0..127` (all or none, `docs/api.md`). The SDK then lays the keys out itself in a
+  444 px row from x = 18 with keys at y = 174, covering at least two F-to-E octaves from `lowest_key` and widening for the notes sounding,
+  and lights a dot for each tone the player's plan emits. The player does not control it and it does not use the 24 dots. The `chords`
+  player does not use it: its keyboard is static artwork.
+- **Adjustment.** `artwork.py` now adds the 128 keys and 128 activity dots after the existing layers. Our own
+  keyboard already has the same width and left edge and sits above the SDK's row (y 174 to 218), so nothing moved.
+  It was however moved up in the original design so that the amount of space between our physical keyboard and the new virtual
+  keyboard is the same above and below. Snapping to the grid was also removed to better align with the second keyboard.
+- **Rationale.** It shows the pitches the player actually plays after transposition, at no cost in dots.
+- **Consequences.** Not yet checked on the device. A note outside the two octaves of the keyboard widens the row, so its keys narrow.

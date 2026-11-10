@@ -37,7 +37,8 @@ encoder moves one step per click.
 
 The screen shows the keyboard, with the zone 1 keys darker and the zone 2 keys
 lighter. The picture follows the split as you turn encoder 2 and stays on the same
-physical keys when you change the keyboard octave.
+physical keys when you change the keyboard octave. A second keyboard along the
+bottom lights the notes that actually sound, after transposition.
 
 ## How notes are played
 

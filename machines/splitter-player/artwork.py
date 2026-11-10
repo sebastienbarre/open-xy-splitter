@@ -11,16 +11,13 @@ made of layers, from bottom to top:
   3. a 24th dot that is never shown, because the SDK requires all 24;
   4. the key pads (filled discs) and the key outlines, drawn again so the overlays
      do not hide them;
-  5. the caption line the SDK requires, which the player leaves empty.
+  5. the SDK's output keyboard along the bottom: 128 keys and 128 activity dots, which
+     the SDK lays out and lights for the notes the player actually sounds (after
+     transposition). The player never touches them;
+  6. the caption line the SDK requires, which the player leaves empty.
 
 The key geometry comes from the design file designs/splitter.svg: boxes r1..r24
 and pads k1..k24, numbered from the left-most key.
-
-The design's coordinates are fractional, so a line would straddle two pixel rows
-and look blurred or thick. The script snaps them to the pixel grid: every box edge
-and pad centre moves to the middle of a pixel, so each 1 px stroke covers exactly
-one row or column of pixels, and pads become circles of a whole radius. The design
-file stays the reference and is not changed.
 
 Run it from anywhere; it rewrites panel.svg.fragment beside this script.
 """
@@ -39,10 +36,22 @@ KEYS = 24
 PAD_RADIUS = 10
 # The machine's ID, which prefixes the artwork IDs the SDK binds.
 PREFIX = 'splitter_player'
-# Top left corner of the keyboard in the design. An overlay's geometry is relative
-# to it and the overlay is moved there by its transform, because the SDK moves a
-# dot by rewriting its transform.
-ORIGIN = (18, 78)
+
+# The SDK's output keyboard: a row 444 px wide from x = 18, with its keys at y = 174 and
+# its activity dots inside them. The SDK moves and scales every key and dot each frame.
+# Note that these _Y positions match the ones in the SDK's screen_player.hpp routines, but could
+# be entirely different since the X,Y positions of the keys and dots are set by the SDK each frame.
+# They do however help positioning the rest of our UI elements relative to the keyboard.
+OUTPUT_Y = 174
+OUTPUT_WHITE_DOT_Y = 211
+OUTPUT_BLACK_DOT_Y = 195
+MIDI_WHITE = (0, 2, 4, 5, 7, 9, 11)  # pitch classes of the white keys, from C
+OUTPUT_WHITE_FILL = '#F0F0F0'
+OUTPUT_BLACK_FILL = '#000000'
+
+# Note that the parameter row is 20 px high, our physical keyboard representation 64 px and the
+# SDK's output keyboard starts at y = 174, which leaves 174 - 20 - 64 = 90 px, 45 above and 45
+# below ours. The design file's keyboard should reflect that vertical position at 20 + 45 = 65 px.
 
 SVG = '{http://www.w3.org/2000/svg}'
 
@@ -58,26 +67,13 @@ def number(value):
     return ('%.4f' % value).rstrip('0').rstrip('.')
 
 
-def grid(value):
-    """Snaps a coordinate to the middle of the nearest pixel.
-
-    A 1 px stroke centred there covers exactly one pixel row or column.
-
-    value: the coordinate, in pixels.
-    Returns the snapped coordinate, a whole number plus one half. The same input
-    always gives the same output, so edges shared by two keys stay shared.
-    """
-    return int(value + 0.5) + 0.5
-
-
 def box(node):
-    """Finds the bounding rectangle of a key box from the design, snapped to the grid.
+    """Finds the bounding rectangle of a key box from the design.
 
     node: the box's <rect> or <path>. A path is read as pairs of absolute
           coordinates (M, L and C commands), so its curves, which only round the
           box's corners, stay inside the rectangle returned.
-    Returns (left, top, right, bottom) in pixels, each from grid(). Corners are
-    square: the design's rounding is under a pixel.
+    Returns (left, top, right, bottom) in pixels. Corners are square.
     """
     if node.tag == SVG + 'rect':
         x, y = float(node.get('x')), float(node.get('y'))
@@ -86,7 +82,40 @@ def box(node):
         values = [float(n) for n in re.findall(r'-?\d+(?:\.\d+)?', node.get('d'))]
         xs, ys = values[0::2], values[1::2]
         bounds = min(xs), min(ys), max(xs), max(ys)
-    return tuple(grid(v) for v in bounds)
+    return tuple(bounds)
+
+
+def is_black(note):
+    """Tells whether a MIDI note is a black key.
+
+    note: the MIDI note, 0 to 127.
+    """
+    return note % 12 not in MIDI_WHITE
+
+
+def output_keyboard(prefix):
+    """Draws the SDK's output keyboard: 128 keys, then 128 activity dots, all at rest.
+
+    prefix: the artwork ID prefix.
+    Returns the elements, white keys before black keys, then the dots, as the SDK requires.
+    """
+    parts = []
+    for black in (False, True):
+        for note in range(128):
+            if is_black(note) != black:
+                continue
+            parts.append('<path id="%s_key_%d" transform="matrix(1 0 0 1 %s %d)" d="%s" fill="%s" '
+                         'stroke="%s" stroke-width="%s"/>' % (
+                             prefix, note, 0, OUTPUT_Y, 'M0 0H6V27H0Z' if black else 'M0 0H10V44H0Z',
+                             OUTPUT_BLACK_FILL if black else OUTPUT_WHITE_FILL, EDGE, STROKE_WIDTH))
+    for note in range(128):
+        black = is_black(note)
+        fill = OUTPUT_WHITE_FILL if black else OUTPUT_BLACK_FILL
+        parts.append('<circle id="%s_played_%d" transform="matrix(1 0 0 1 0 %d)" cx="0" cy="0" r="%s" '
+                     'fill="%s" stroke="%s" stroke-width="0.5"/>' % (
+                         prefix, note, OUTPUT_BLACK_DOT_Y if black else OUTPUT_WHITE_DOT_Y,
+                         '2.5' if black else '3', fill, fill))
+    return parts
 
 
 def key_box(bounds, paint):
@@ -106,13 +135,11 @@ def overlay(boxes, last):
 
     boxes: the bounding rectangle of each key, from the left-most.
     last:  the number of keys to cover, from the left-most.
-    Returns the path data, one rectangle per key, relative to ORIGIN. Corners are
+    Returns the path data, one rectangle per key, in page coordinates. Corners are
     square, which the key outlines drawn on top hide.
     """
     subpaths = []
     for x0, y0, x1, y1 in boxes[:last]:
-        x0, x1 = x0 - ORIGIN[0], x1 - ORIGIN[0]
-        y0, y1 = y0 - ORIGIN[1], y1 - ORIGIN[1]
         subpaths.append('M%s %s L%s %s L%s %s L%s %s Z' % (
             number(x0), number(y0), number(x1), number(y0),
             number(x1), number(y1), number(x0), number(y1)))
@@ -135,11 +162,12 @@ def build(design):
     for k in range(KEYS):
         parts.append(key_box(boxes[k], zone2))
 
-    # Layer 2: dot k is zone 1 over keys 1..k + 1, for a split at key k + 2.
+    # Layer 2: dot k is zone 1 over keys 1..k + 1, for a split at key k + 2. The SDK shows or
+    # hides a dot by moving its x translation, so its shapes are in page coordinates.
     for dot in range(KEYS - 1):
-        parts.append('<path id="%s_dot_%d" transform="matrix(1 0 0 1 %d %d)" d="%s" fill="%s" '
+        parts.append('<path id="%s_dot_%d" transform="matrix(1 0 0 1 0 0)" d="%s" fill="%s" '
                      'stroke="%s" stroke-width="%s"/>' % (
-                         PREFIX, dot, ORIGIN[0], ORIGIN[1], overlay(boxes, dot + 1), ZONE1_FILL, EDGE, STROKE_WIDTH))
+                         PREFIX, dot, overlay(boxes, dot + 1), ZONE1_FILL, EDGE, STROKE_WIDTH))
 
     # Layer 3: the 24th dot waits off screen, never shown.
     parts.append('<circle id="%s_dot_23" transform="matrix(1 0 0 1 -50 -50)" cx="0" cy="0" r="1" '
@@ -150,11 +178,14 @@ def build(design):
     for k in range(1, KEYS + 1):
         pad = nodes['k%d' % k]
         parts.append('<circle cx="%s" cy="%s" r="%s" %s/>' % (
-            number(grid(float(pad.get('cx')))), number(grid(float(pad.get('cy')))), PAD_RADIUS, pad_paint))
+            number(float(pad.get('cx'))), number(float(pad.get('cy'))), PAD_RADIUS, pad_paint))
     for k in range(KEYS):
         parts.append(key_box(boxes[k], outline))
 
-    # Layer 5: the SDK requires a caption; the player leaves it empty.
+    # Layer 5: the SDK's output keyboard, below our keyboard.
+    parts.extend(output_keyboard(PREFIX))
+
+    # Layer 6: the SDK requires a caption; the player leaves it empty.
     parts.append('<text id="%s_text" transform="matrix(1 0 0 1 240 215)" fill="#F2F2F2" '
                  'font-family="UniversNextPro-Light" font-size="22">splitter</text>' % PREFIX)
     parts.append('</g>')
