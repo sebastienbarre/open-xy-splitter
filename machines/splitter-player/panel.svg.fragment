@@ -96,6 +96,7 @@
 <rect x="398.569" y="96.747" width="31.716" height="31.745" fill="none" stroke="#000000" stroke-width="1.0"/>
 <rect x="414.42" y="65" width="47.571" height="31.747" fill="none" stroke="#000000" stroke-width="1.0"/>
 <rect x="430.285" y="96.747" width="31.715" height="31.745" fill="none" stroke="#000000" stroke-width="1.0"/>
+<text id="splitter_player_text" transform="matrix(1 0 0 1 240 150)" fill="#AFAFAF" font-family="UniversNextPro-Light" font-size="17">splitter</text>
 <path id="splitter_player_key_0" transform="matrix(1 0 0 1 0 174)" d="M0 0H10V44H0Z" fill="#F0F0F0" stroke="#000000" stroke-width="1.0"/>
 <path id="splitter_player_key_2" transform="matrix(1 0 0 1 0 174)" d="M0 0H10V44H0Z" fill="#F0F0F0" stroke="#000000" stroke-width="1.0"/>
 <path id="splitter_player_key_4" transform="matrix(1 0 0 1 0 174)" d="M0 0H10V44H0Z" fill="#F0F0F0" stroke="#000000" stroke-width="1.0"/>
@@ -352,5 +353,4 @@
 <circle id="splitter_player_played_125" transform="matrix(1 0 0 1 0 211)" cx="0" cy="0" r="3" fill="#000000" stroke="#000000" stroke-width="0.5"/>
 <circle id="splitter_player_played_126" transform="matrix(1 0 0 1 0 195)" cx="0" cy="0" r="2.5" fill="#F0F0F0" stroke="#F0F0F0" stroke-width="0.5"/>
 <circle id="splitter_player_played_127" transform="matrix(1 0 0 1 0 211)" cx="0" cy="0" r="3" fill="#000000" stroke="#000000" stroke-width="0.5"/>
-<text id="splitter_player_text" transform="matrix(1 0 0 1 240 215)" fill="#F2F2F2" font-family="UniversNextPro-Light" font-size="22">splitter</text>
 </g>

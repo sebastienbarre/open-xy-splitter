@@ -108,7 +108,7 @@ void display_page() {
     Rig r;
     Display shown = {};
     splitter_player::display(r.state, r.controls, shown);
-    require(shown.lit == 1u << 11 && std::string(shown.text).empty());
+    require(shown.lit == 1u << 11 && std::string(shown.text) == "F3..E4 | F4..E5");
     require(std::string(shown.values[0]) == "+0" && std::string(shown.values[1]) == "13" &&
             std::string(shown.values[2]) == "+0" && std::string(shown.values[3]).empty());
     r.controls.value[0] = transpose(-4);
@@ -126,6 +126,39 @@ void display_page() {
         require(shown.lit == 1u << (s - 2));
         require(std::string(shown.values[1]) == std::to_string(s));
     }
+}
+
+std::string ranges(const Rig& r) {
+    Display shown = {};
+    splitter_player::display(r.state, r.controls, shown);
+    return shown.text;
+}
+
+void range_caption() {
+    Rig r;
+    require(ranges(r) == "F3..E4 | F4..E5");
+    r.controls.lowest_key = F3 - 12;
+    require(ranges(r) == "F2..E3 | F3..E4");
+    r.controls.value[0] = transpose(-1);
+    r.controls.value[2] = transpose(1);
+    require(ranges(r) == "F1..E2 | F4..E5");
+    r.controls.lowest_key = F3;
+    r.controls.value[0] = transpose(0);
+    r.controls.value[2] = transpose(0);
+    r.controls.value[1] = split(2);
+    require(ranges(r) == "F3..F3 | F#3..E5");
+    // Clamped to MIDI 0..127.
+    r.controls.value[1] = split(13);
+    r.controls.lowest_key = 5;
+    r.controls.value[0] = transpose(-1);
+    r.controls.value[2] = transpose(-4);
+    require(ranges(r) == "C-1..E-1 | -");
+    r.controls.lowest_key = 60;
+    r.controls.value[0] = transpose(0);
+    r.controls.value[2] = transpose(4);
+    require(ranges(r) == "C4..B4 | C9..G9");
+    r.controls.lowest_key = 113;
+    require(ranges(r) == "F8..E9 | -");
 }
 
 void controls_extremes() {
@@ -149,6 +182,7 @@ int main() {
     pitch_limits();
     note_lifecycle();
     display_page();
+    range_caption();
     controls_extremes();
     std::puts("ok");
 }

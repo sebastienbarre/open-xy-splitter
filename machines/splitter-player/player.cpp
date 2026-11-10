@@ -118,6 +118,41 @@ void append(char* out, u32& length, u32 size, u32 n) {
     do { digits[count++] = static_cast<char>('0' + n % 10); n /= 10; } while (n);
     while (count) { const char c[2] = {digits[--count], 0}; append(out, length, size, c); }
 }
+
+// Note names from C, for MIDI note 0 = C-1, so MIDI note 53 = F3 at the keyboard's default octave.
+const char* const kNoteNames[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+// Appends a note's name and octave, such as "F3" or "C#-1".
+//   out, length, size  as for the text overload
+//   note               the MIDI note, 0 .. 127
+void append_note(char* out, u32& length, u32 size, u32 note) {
+    append(out, length, size, kNoteNames[note % 12]);
+    const i32 octave = static_cast<i32>(note / 12) - 1;
+    if (octave < 0) append(out, length, size, "-");
+    append(out, length, size, static_cast<u32>(octave < 0 ? -octave : octave));
+}
+
+// Appends the notes a zone's keys play, such as "F3..E4", clamped to MIDI 0 .. 127.
+//   out, length, size  as for the text overload
+//   controls           the player's four encoders and the keyboard's lowest key
+//   zone               0 for zone 1, 1 for zone 2
+// Appends "-" when the whole zone falls outside MIDI 0 .. 127, so it is silent.
+void append_range(char* out, u32& length, u32 size, const Controls& controls, u32 zone) {
+    const i32 split = static_cast<i32>(split_key(controls));
+    const i32 lowest = static_cast<i32>(controls.lowest_key);
+    const i32 first = zone == 0 ? lowest : lowest + split - 1;
+    const i32 last = zone == 0 ? lowest + split - 2 : lowest + static_cast<i32>(kKeysCount) - 1;
+    const i32 shift = 12 * octaves(controls, zone);
+    const i32 low = first + shift < 0 ? 0 : first + shift;
+    const i32 high = last + shift > 127 ? 127 : last + shift;
+    if (low > high) {
+        append(out, length, size, "-");
+        return;
+    }
+    append_note(out, length, size, static_cast<u32>(low));
+    append(out, length, size, "..");
+    append_note(out, length, size, static_cast<u32>(high));
+}
 }
 
 // Plays a pressed key, live or sequenced, in the zone it belongs to.
@@ -157,11 +192,14 @@ bool release(State&, u32) { return false; }
 //   display   receives the page
 // `display.lit` has one bit set: dot k is the zone 1 overlay for a split at
 // key k + 2 (keys 1 .. k + 1), drawn over the zone 2 keyboard. The values are
-// the two transpositions, such as "+0", and the split's key number.
+// the two transpositions, such as "+0", and the split's key number. The text is
+// the notes each zone plays, after transposition and clamped to MIDI 0 .. 127.
 void display(const State&, const Controls& controls, Display& display) {
+    // zone 1 overlay
     const u32 key = split_key(controls);
     display.lit = 1u << (key - kMinSplitPosition);
-    display.text[0] = 0;
+
+    // zone 1 and zone 2 transposition values
     for (u32 zone = 0; zone < 2; ++zone) {
         char* out = display.values[zone == 0 ? kZone1TranspositionEncoder : kZone2TranspositionEncoder];
         const i32 n = octaves(controls, zone);
@@ -170,10 +208,21 @@ void display(const State&, const Controls& controls, Display& display) {
         append(out, length, sizeof(display.values[0]), n < 0 ? "-" : "+");
         append(out, length, sizeof(display.values[0]), static_cast<u32>(n < 0 ? -n : n));
     }
+
+    // split position
     char* out = display.values[kSplitPositionEncoder];
     u32 length = 0;
     out[0] = 0;
     append(out, length, sizeof(display.values[kSplitPositionEncoder]), key);
+
+    // encoder 4 is not used
     display.values[3][0] = 0;
+
+    // Use the player API-provided text caption to display both zones' notes, such as "F3..E4 | F4..E5"
+    length = 0;
+    display.text[0] = 0;
+    append_range(display.text, length, sizeof(display.text), controls, 0);
+    append(display.text, length, sizeof(display.text), " | ");
+    append_range(display.text, length, sizeof(display.text), controls, 1);
 }
 }
